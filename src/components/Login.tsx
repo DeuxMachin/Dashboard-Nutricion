@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [rut, setRut] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,12 +15,12 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      const success = await login(username, password);
+      const success = await login(rut, password);
       if (!success) {
-        setError('Credenciales inválidas');
+        setError('Credenciales inválidas. Verifica tu RUT y contraseña.');
       }
     } catch (err) {
-      setError('Error al iniciar sesión');
+      setError('Error al iniciar sesión. Verifica tu conexión.');
     } finally {
       setIsLoading(false);
     }
@@ -44,21 +44,19 @@ const Login: React.FC = () => {
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
-            )}
-
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                Usuario
+            )}            <div>
+              <label htmlFor="rut" className="block text-sm font-medium text-gray-700 mb-2">
+                RUT
               </label>
               <input
-                id="username"
-                name="username"
+                id="rut"
+                name="rut"
                 type="text"
                 required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={rut}
+                onChange={(e) => setRut(e.target.value)}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
-                placeholder="Ingresa tu usuario"
+                placeholder="Ingresa tu RUT "
               />
             </div>
 
@@ -95,11 +93,10 @@ const Login: React.FC = () => {
                 'Iniciar Sesión'
               )}
             </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
-              Demo: Cualquier usuario y contraseña te permitirá acceder
+          </form>          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              ¿No tienes una cuenta? Debes comunicarte con el administrador del sistema para que te cree una cuenta.
+            
             </p>
           </div>
         </div>

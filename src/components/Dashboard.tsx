@@ -15,17 +15,21 @@ const Dashboard: React.FC = () => {
                 Dashboard
               </h1>
             </div>
-            
-            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center">
                   <span className="text-white text-sm font-medium">
-                    {user?.username.charAt(0).toUpperCase()}
+                    {user?.nombre?.charAt(0).toUpperCase()}{user?.apellido?.charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <span className="text-sm font-medium text-gray-700">
-                  {user?.username}
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.nombre} {user?.apellido}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {user?.role}
+                  </span>
+                </div>
               </div>
               
               <button
@@ -69,11 +73,11 @@ const Dashboard: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
-                </div>
-                <div className="ml-4">
+                </div>                <div className="ml-4">
                   <h3 className="text-lg font-medium text-gray-900">Usuario</h3>
-                  <p className="text-sm text-gray-500">{user?.username}</p>
+                  <p className="text-sm text-gray-500">{user?.nombre} {user?.apellido}</p>
                   <p className="text-xs text-gray-400">{user?.email}</p>
+                  <p className="text-xs text-gray-400">RUT: {user?.username}</p>
                 </div>
               </div>
             </div>

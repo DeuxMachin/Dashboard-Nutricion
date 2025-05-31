@@ -1,15 +1,20 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authAPI } from '../api/api.js';
 
 interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
+  nombre: string;
+  apellido: string;
+  role: string;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  loading: boolean;
   isAuthenticated: boolean;
 }
 
@@ -21,24 +26,59 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Verificar si hay un token guardado al cargar la aplicación
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+      
+      if (token && savedUser) {
+        try {
+          // Verificar que el token sigue siendo válido
+          const userData = await authAPI.getCurrentUser();
+          setUser(JSON.parse(savedUser));
+        } catch (error) {
+          // Token inválido, limpiar localStorage
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
+
+    checkAuthStatus();
+  }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // Simulación de login - más adelante conectaremos con MySQL
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simular llamada API
-    
-    if (username.trim() && password.trim()) {
-      const mockUser: User = {
-        id: '1',
-        username: username,
-        email: `${username}@example.com`
-      };
-      setUser(mockUser);
-      return true;
+    try {
+      setLoading(true);
+      const response = await authAPI.login(username, password);
+      
+      if (response.success) {
+        const userData = response.user;
+        
+        // Guardar token y datos del usuario
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        setUser(userData);
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      console.error('Error en login:', error);
+      return false;
+    } finally {
+      setLoading(false);
     }
-    return false;
   };
 
   const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
@@ -48,7 +88,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     login,
     logout,
-    isAuthenticated
+    loading,
+    isAuthenticated,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
