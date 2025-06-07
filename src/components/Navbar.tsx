@@ -1,8 +1,19 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  currentView?: string;
+  setCurrentView?: (view: string) => void;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ currentView = 'dashboard', setCurrentView }) => {
   const { user, logout } = useAuth();
+
+  const handleNavClick = (view: string) => {
+    if (setCurrentView) {
+      setCurrentView(view);
+    }
+  };
 
   return (
     <nav className="bg-white border-b border-gray-200">
@@ -23,18 +34,46 @@ const Navbar: React.FC = () => {
             {/* Navegación principal */}
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
               <div className="flex space-x-4">
-                <a href="#" className="px-3 py-2 rounded-md text-sm font-medium text-gray-900 border-b-2 border-green-500">
+                <button 
+                  onClick={() => handleNavClick('dashboard')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                    currentView === 'dashboard' 
+                      ? 'text-gray-900 border-b-2 border-green-500' 
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
                   Dashboard
-                </a>
-                <a href="#" className="px-3 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900">
+                </button>
+                <button 
+                  onClick={() => handleNavClick('pacientes')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                    currentView === 'pacientes' 
+                      ? 'text-gray-900 border-b-2 border-green-500' 
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
                   Pacientes
-                </a>
-                <a href="#" className="px-3 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900">
+                </button>
+                <button 
+                  onClick={() => handleNavClick('avances')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                    currentView === 'avances' 
+                      ? 'text-gray-900 border-b-2 border-green-500' 
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
                   Avances
-                </a>
-                <a href="#" className="px-3 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900">
+                </button>
+                <button 
+                  onClick={() => handleNavClick('estadisticas')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                    currentView === 'estadisticas' 
+                      ? 'text-gray-900 border-b-2 border-green-500' 
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
                   Estadísticas
-                </a>
+                </button>
               </div>
             </div>
           </div>

@@ -1,14 +1,11 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import Navbar from './Navbar';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
       {/* Contenido principal sin panel lateral */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         <div className="mb-8">
