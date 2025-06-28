@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
-  const [rut, setRut] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'email' | 'rut'>('rut');
   
-  const { login } = useAuth();
+  const { login, loginWithRut } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,12 +16,19 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      const success = await login(rut, password);
-      if (!success) {
-        setError('Credenciales inválidas. Verifica tu RUT y contraseña.');
+      let success = false;
+      
+      if (loginMethod === 'email') {
+        success = await login(username, password);
+      } else {
+        success = await loginWithRut(username, password);
       }
-    } catch (err) {
-      setError('Error al iniciar sesión. Verifica tu conexión.');
+      
+      if (!success) {
+        setError('Credenciales inválidas. Verifica tu información y contraseña.');
+      }
+    } catch (err: any) {
+      setError(err?.error || 'Error al iniciar sesión. Verifica tu conexión.');
     } finally {
       setIsLoading(false);
     }
@@ -44,19 +52,47 @@ const Login: React.FC = () => {
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
-            )}            <div>
-              <label htmlFor="rut" className="block text-sm font-medium text-gray-700 mb-2">
+            )}
+
+            {/* Selector de método de login */}
+            <div className="flex space-x-4 p-1 bg-gray-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setLoginMethod('rut')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  loginMethod === 'rut'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
                 RUT
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginMethod('email')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  loginMethod === 'email'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Email
+              </button>
+            </div>
+
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                {loginMethod === 'email' ? 'Correo Electrónico' : 'RUT'}
               </label>
               <input
-                id="rut"
-                name="rut"
-                type="text"
+                id="username"
+                name="username"
+                type={loginMethod === 'email' ? 'email' : 'text'}
                 required
-                value={rut}
-                onChange={(e) => setRut(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
-                placeholder="Ingresa tu RUT "
+                placeholder={loginMethod === 'email' ? 'ejemplo@correo.com' : 'Ingresa tu RUT'}
               />
             </div>
 
@@ -93,11 +129,23 @@ const Login: React.FC = () => {
                 'Iniciar Sesión'
               )}
             </button>
-          </form>          <div className="mt-6 text-center">
+          </form>
+
+          <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              ¿No tienes una cuenta? Debes comunicarte con el administrador del sistema para que te cree una cuenta.
-            
+              ¿No tienes una cuenta?{' '}
+              <span className="text-indigo-600 font-medium">
+                Comunícate con el administrador del sistema.
+              </span>
             </p>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>Credenciales de prueba:</strong><br />
+                RUT: 12345678-9 | Contraseña: test123<br />
+                Email: test@nutricion.com | Contraseña: test123
+              </p>
+            </div>
           </div>
         </div>
       </div>
