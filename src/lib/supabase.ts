@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Tipos para TypeScript
+// Tipos para TypeScriptaa
 export interface Nutricionista {
   id_nutri: number;
   nombre: string;
