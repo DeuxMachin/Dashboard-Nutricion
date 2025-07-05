@@ -7,7 +7,6 @@ export interface Nutricionista {
   rut: string;
   correo: string;
   telefono?: string;
-  especialidad?: string;
 }
 
 export interface Cliente {
@@ -21,6 +20,17 @@ export interface Cliente {
   id_plan?: number;
   progreso: 'Pendiente' | 'Regular' | 'Bueno' | 'Excelente';
   ultimavisita?: string;
+  telefono?: string;
+  fecha_nacimiento?: string; 
+  genero?: 'Masculino' | 'Femenino' | 'Otro';
+  altura?: number;
+  peso?: number;
+  alergias?: string[]; 
+  condiciones_medicas?: string[]; 
+  tratamientos?: string[];
+  peso_objetivo?: number;
+  objetivos?: string;
+
 }
 
 export interface Login {

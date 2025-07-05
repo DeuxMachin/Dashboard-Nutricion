@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { clientesService } from '../services/api/clientesService';
 import type { Cliente } from '../types/index';
 import { sanitizeInput, escapeHtml } from '../utils/security';
+import DropdownMenu from './ui/DropdownMenu';
+import { NuevoPacienteForm } from './pacientes/NuevoPacienteForm';
 
 const Pacientes: React.FC = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -9,6 +11,8 @@ const Pacientes: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroProgreso, setFiltroProgreso] = useState<string>('');
+  const [showNewPatientForm, setShowNewPatientForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   
   const [paginaActual, setPaginaActual] = useState(1);
@@ -163,18 +167,145 @@ const Pacientes: React.FC = () => {
   // Funciones para las acciones de cada paciente
   const handleVer = (cliente: Cliente) => {
     // Aquí iría la lógica para ver los detalles del paciente
+    console.log('Ver detalles de:', cliente.nombre);
   };
 
   const handleEditar = (cliente: Cliente) => {
     // Aquí iría la lógica para editar el paciente
+    console.log('Editar paciente:', cliente.nombre);
   };
 
   const handleEliminar = (cliente: Cliente) => {
     // Confirmar antes de eliminar un paciente
     if (window.confirm(`¿Estás seguro de que deseas eliminar a ${cliente.nombre} ${cliente.apellido}?`)) {
       // Aquí iría la lógica para eliminar el paciente
+      console.log('Eliminar paciente:', cliente.nombre);
     }
   };
+
+  // Nuevas funciones para las acciones adicionales
+  const handleRegistrarVisita = (cliente: Cliente) => {
+    // Aquí iría la lógica para registrar una nueva visita
+    console.log('Registrar visita para:', cliente.nombre);
+  };
+
+  const handleEditarPlan = (cliente: Cliente) => {
+    // Aquí iría la lógica para editar el plan nutricional
+    console.log('Editar plan de:', cliente.nombre);
+  };
+
+  const handleVerHistorial = (cliente: Cliente) => {
+    // Aquí iría la lógica para ver el historial médico
+    console.log('Ver historial de:', cliente.nombre);
+  };
+
+  const handleEnviarMensaje = (cliente: Cliente) => {
+    // Aquí iría la lógica para enviar un mensaje al paciente
+    console.log('Enviar mensaje a:', cliente.nombre);
+  };
+
+  // Función para manejar el nuevo paciente
+  const handleNuevoPaciente = async (data: Partial<Cliente>) => {
+    try {
+      setIsSubmitting(true);
+      setError('');
+      
+      const nuevoCliente = await clientesService.createCliente(data);
+      
+      // Actualizar la lista de clientes
+      setClientes(prev => [nuevoCliente, ...prev]);
+      setShowNewPatientForm(false);
+      
+      // Mensaje de éxito (podrías agregar un toast aquí)
+      console.log('Paciente creado exitosamente:', nuevoCliente.nombre);
+      
+    } catch (err) {
+      console.error('Error al crear paciente:', err);
+      setError('Error al crear el paciente. Por favor, intenta nuevamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelNewPatient = () => {
+    setShowNewPatientForm(false);
+    setError('');
+  };
+
+  // Función para generar las opciones del dropdown menu
+  const getDropdownOptions = (cliente: Cliente) => [
+    {
+      label: 'Ver detalles',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+      ),
+      onClick: () => handleVer(cliente),
+      color: 'default' as const
+    },
+    {
+      label: 'Registrar visita',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      onClick: () => handleRegistrarVisita(cliente),
+      color: 'success' as const
+    },
+    {
+      label: 'Editar plan',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      onClick: () => handleEditarPlan(cliente),
+      color: 'warning' as const
+    },
+    {
+      label: 'Ver historial',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+      onClick: () => handleVerHistorial(cliente),
+      color: 'default' as const
+    },
+    {
+      label: 'Enviar mensaje',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      ),
+      onClick: () => handleEnviarMensaje(cliente),
+      color: 'default' as const
+    },
+    {
+      label: 'Editar paciente',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      onClick: () => handleEditar(cliente),
+      color: 'warning' as const
+    },
+    {
+      label: 'Eliminar paciente',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      ),
+      onClick: () => handleEliminar(cliente),
+      color: 'danger' as const
+    }
+  ];
 
   if (loading) {
     return (
@@ -182,6 +313,42 @@ const Pacientes: React.FC = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando pacientes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si mostrar formulario de nuevo paciente
+  if (showNewPatientForm) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center">
+              <button
+                onClick={handleCancelNewPatient}
+                className="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Nuevo Paciente</h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Completa la información para registrar un nuevo paciente
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <NuevoPacienteForm
+            onSubmit={handleNuevoPaciente}
+            onCancel={handleCancelNewPatient}
+            isLoading={isSubmitting}
+          />
         </div>
       </div>
     );
@@ -199,7 +366,10 @@ const Pacientes: React.FC = () => {
                 Gestiona y monitorea a todos tus pacientes
               </p>
             </div>
-            <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition duration-200 flex items-center">
+            <button 
+              onClick={() => setShowNewPatientForm(true)}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition duration-200 flex items-center"
+            >
               <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
@@ -338,7 +508,7 @@ const Pacientes: React.FC = () => {
         )}
 
         {/* Lista de pacientes */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
           {clientesFiltrados.length === 0 ? (
             <div className="text-center py-12">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,7 +545,7 @@ const Pacientes: React.FC = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {clientesPaginados.map((cliente) => (
                       <tr key={cliente.id_cliente} className="hover:bg-gray-50 transition-colors duration-150">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-6 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
                               <span className="text-sm font-medium text-green-600">
@@ -392,55 +562,23 @@ const Pacientes: React.FC = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-6 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{cliente.correo || 'Sin correo'}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-6 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getProgresoColor(cliente.progreso)}`}>
                             {cliente.progreso}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-6 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(cliente.ultimavisita)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            {/* Botón Ver */}
-                            <button
-                              onClick={() => handleVer(cliente)}
-                              className="inline-flex items-center px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors duration-200 border border-blue-200"
-                              title="Ver detalles"
-                            >
-                              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                              Ver
-                            </button>
-
-                            {/* Botón Editar */}
-                            <button
-                              onClick={() => handleEditar(cliente)}
-                              className="inline-flex items-center px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-100 transition-colors duration-200 border border-amber-200"
-                              title="Editar información"
-                            >
-                              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              Editar
-                            </button>
-
-                            {/* Botón Eliminar */}
-                            <button
-                              onClick={() => handleEliminar(cliente)}
-                              className="inline-flex items-center px-3 py-1.5 bg-red-50 text-red-700 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors duration-200 border border-red-200"
-                              title="Eliminar paciente"
-                            >
-                              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                              Eliminar
-                            </button>
+                        <td className="px-6 py-6 whitespace-nowrap text-sm font-medium">
+                          <div className="flex justify-end pr-2">
+                            <DropdownMenu 
+                              options={getDropdownOptions(cliente)}
+                              className="relative"
+                            />
                           </div>
                         </td>
                       </tr>
