@@ -49,15 +49,9 @@ export const authService = {
       // Obtener rol del usuario
       const { data: loginData, error: loginError } = await supabase
         .from('login')
-        .select('rol, ultimo_acceso')
+        .select('rol')
         .eq('id_nutri', nutricionistaData.id_nutri)
         .single();
-
-      // Actualizar último acceso
-      await supabase
-        .from('login')
-        .update({ ultimo_acceso: new Date().toISOString() })
-        .eq('id_nutri', nutricionistaData.id_nutri);
 
       const userRole = loginData?.rol || 'Nutricionista';
 
@@ -125,12 +119,6 @@ export const authService = {
       if (sanitizedPassword !== login.contrasena_hash) {
         throw new Error('Contraseña incorrecta');
       }
-
-      // Actualizar registro de último acceso
-      await supabase
-        .from('login')
-        .update({ ultimo_acceso: new Date().toISOString() })
-        .eq('id_nutri', nutricionista.id_nutri);
 
       // Crear token de sesión con información del usuario
       const tokenPayload = {

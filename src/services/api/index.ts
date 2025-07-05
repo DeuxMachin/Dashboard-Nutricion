@@ -2,6 +2,7 @@
 export { authService } from './authService.js';
 export { clientesService } from './clientesService.js';
 export { medidasService, consultasService } from './medidasService.js';
+export { dashboardService } from './dashboardService.js';
 
 // Función de prueba de conexión
 import { supabase } from '../../lib/supabase.js';

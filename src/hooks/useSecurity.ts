@@ -91,9 +91,7 @@ export const useSecurityMonitor = () => {
         const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(value));
         
         if (isSuspicious) {
-          console.warn('Actividad sospechosa detectada:', value);
-          // En producción, podrías enviar esto a un servicio de logging
-          // logSecurityEvent('suspicious_input', { value, timestamp: new Date().toISOString() });
+          // En producción, esto se podría enviar a un servicio de logging de seguridad
         }
       }
     };
