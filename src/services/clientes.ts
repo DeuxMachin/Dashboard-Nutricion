@@ -18,7 +18,6 @@ export const getClientes = async (): Promise<Cliente[]> => {
     const clientes = await clientesAPI.getClientes();
     return clientes;
   } catch (error) {
-    console.error('Error al obtener clientes:', error);
     throw error;
   }
 };

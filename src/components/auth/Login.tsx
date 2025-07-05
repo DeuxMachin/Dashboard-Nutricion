@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { validateEmail, validateRUT, sanitizeInput, loginRateLimit } from '../../utils/security';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -7,8 +8,62 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [loginMethod, setLoginMethod] = useState<'email' | 'rut'>('rut');
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   
   const { login, loginWithRut } = useAuth();
+  
+  // Implementar monitoreo de seguridad directamente
+  useEffect(() => {
+    const detectSuspiciousActivity = (event: Event) => {
+      const target = event.target as HTMLElement;
+      
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        const value = (target as HTMLInputElement).value;
+        
+        const suspiciousPatterns = [
+          /<script/i,
+          /javascript:/i,
+          /on\w+=/i,
+          /eval\(/i,
+          /document\./i,
+          /window\./i,
+        ];
+
+        const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(value));
+        
+        if (isSuspicious) {
+          console.warn('Actividad sospechosa detectada en login:', value);
+        }
+      }
+    };
+
+    document.addEventListener('input', detectSuspiciousActivity);
+    
+    return () => {
+      document.removeEventListener('input', detectSuspiciousActivity);
+    };
+  }, []);
+
+  // Validar entrada en tiempo real
+  useEffect(() => {
+    const errors: string[] = [];
+    
+    if (username) {
+      const sanitized = sanitizeInput(username);
+      if (sanitized !== username) {
+        errors.push('El campo contiene caracteres no válidos');
+      }
+      
+      if (loginMethod === 'email' && !validateEmail(username)) {
+        errors.push('Formato de email inválido');
+      } else if (loginMethod === 'rut' && !validateRUT(username)) {
+        errors.push('Formato de RUT inválido');
+      }
+    }
+    
+    setValidationErrors(errors);
+  }, [username, loginMethod]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,19 +71,42 @@ const Login: React.FC = () => {
     setError('');
 
     try {
+      // Verificar rate limiting antes de hacer la petición
+      const clientId = loginMethod === 'email' ? `email_${username}` : `rut_${username}`;
+      if (!loginRateLimit.isAllowed(clientId)) {
+        const remaining = loginRateLimit.getRemainingAttempts(clientId);
+        setRemainingAttempts(remaining);
+        throw new Error(`Demasiados intentos de login. Intentos restantes: ${remaining}. Intenta de nuevo en 15 minutos.`);
+      }
+
+      // Validar datos antes de enviar
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors[0]);
+      }
+
+      // Sanitizar datos de entrada
+      const sanitizedUsername = sanitizeInput(username);
+      const sanitizedPassword = sanitizeInput(password);
+
       let success = false;
       
       if (loginMethod === 'email') {
-        success = await login(username, password);
+        success = await login(sanitizedUsername, sanitizedPassword);
       } else {
-        success = await loginWithRut(username, password);
+        success = await loginWithRut(sanitizedUsername, sanitizedPassword);
       }
       
       if (!success) {
         setError('Credenciales inválidas. Verifica tu información y contraseña.');
       }
     } catch (err: any) {
-      setError(err?.error || 'Error al iniciar sesión. Verifica tu conexión.');
+      setError(err?.error || err?.message || 'Error al iniciar sesión. Verifica tu conexión.');
+      
+      // Actualizar intentos restantes si es error de rate limiting
+      if (err?.message?.includes('Intentos restantes')) {
+        const clientId = loginMethod === 'email' ? `email_${username}` : `rut_${username}`;
+        setRemainingAttempts(loginRateLimit.getRemainingAttempts(clientId));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -51,6 +129,21 @@ const Login: React.FC = () => {
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
+                {remainingAttempts !== null && remainingAttempts <= 2 && (
+                  <div className="mt-2 text-xs">
+                    ⚠️ Solo te quedan {remainingAttempts} intentos antes del bloqueo temporal.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {validationErrors.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg text-sm">
+                <ul className="list-disc list-inside">
+                  {validationErrors.map((err, index) => (
+                    <li key={index}>{err}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -90,9 +183,16 @@ const Login: React.FC = () => {
                 type={loginMethod === 'email' ? 'email' : 'text'}
                 required
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+                onChange={(e) => {
+                  const sanitized = sanitizeInput(e.target.value);
+                  setUsername(sanitized);
+                }}
+                className={`w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 ${
+                  validationErrors.length > 0 ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder={loginMethod === 'email' ? 'ejemplo@correo.com' : 'Ingresa tu RUT'}
+                maxLength={loginMethod === 'email' ? 100 : 12}
+                autoComplete={loginMethod === 'email' ? 'email' : 'username'}
               />
             </div>
 
@@ -106,15 +206,20 @@ const Login: React.FC = () => {
                 type="password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  const sanitized = sanitizeInput(e.target.value);
+                  setPassword(sanitized);
+                }}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
                 placeholder="Ingresa tu contraseña"
+                maxLength={128}
+                autoComplete="current-password"
               />
             </div>
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || validationErrors.length > 0 || (remainingAttempts !== null && remainingAttempts === 0)}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
             >
               {isLoading ? (

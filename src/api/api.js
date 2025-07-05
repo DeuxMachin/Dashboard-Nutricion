@@ -207,7 +207,8 @@ export const clientesAPI = {
         .select('*')
         .eq('id_nutri', nutricionistaId)
         .eq('inactividad', false)
-        .order('fecha_registro', { ascending: false });
+        .order('ultimavisita', { ascending: false, nullsFirst: false })
+        .order('id_cliente', { ascending: false });
 
       if (error) {
         throw new Error('Error al obtener clientes: ' + error.message);
@@ -252,8 +253,7 @@ export const clientesAPI = {
         ...clienteData,
         id_nutri: nutricionistaId,
         inactividad: false,
-        progreso: clienteData.progreso || 'Pendiente',
-        fecha_registro: new Date().toISOString()
+        progreso: clienteData.progreso || 'Pendiente'
       };
 
       const { data, error } = await supabase

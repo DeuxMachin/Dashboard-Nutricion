@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { getClientes, Cliente } from '../services/clientes';
+import React, { useEffect, useState, useCallback } from 'react';
+import { clientesService } from '../services/api/clientesService';
+import type { Cliente } from '../types/index';
+import { sanitizeInput, escapeHtml } from '../utils/security';
 
 const Pacientes: React.FC = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -12,14 +14,76 @@ const Pacientes: React.FC = () => {
   const [paginaActual, setPaginaActual] = useState(1);
   const clientesPorPagina = 7;
 
+  // Función para verificar integridad de datos - memoizada para evitar re-renders
+  const checkDataIntegrity = useCallback((data: any): boolean => {
+    try {
+      const jsonString = JSON.stringify(data);
+      const maliciousPatterns = [
+        /<script/i,
+        /javascript:/i,
+        /on\w+=/i,
+        /data:text\/html/i,
+        /vbscript:/i
+      ];
+      return !maliciousPatterns.some(pattern => pattern.test(jsonString));
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Monitoreo de seguridad implementado directamente
+  useEffect(() => {
+    const detectSuspiciousActivity = (event: Event) => {
+      const target = event.target as HTMLElement;
+      
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        const value = (target as HTMLInputElement).value;
+        
+        const suspiciousPatterns = [
+          /<script/i,
+          /javascript:/i,
+          /on\w+=/i,
+          /eval\(/i,
+          /document\./i,
+          /window\./i,
+        ];
+
+        const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(value));
+        
+        if (isSuspicious) {
+          console.warn('Actividad sospechosa detectada en Pacientes:', value);
+        }
+      }
+    };
+
+    document.addEventListener('input', detectSuspiciousActivity);
+    
+    return () => {
+      document.removeEventListener('input', detectSuspiciousActivity);
+    };
+  }, []);
+
   useEffect(() => {
     const fetchClientes = async () => {
       try {
         setLoading(true);
-        const data = await getClientes();
-        setClientes(data);
+        const data = await clientesService.getClientes();
+        
+        // Validar integridad de los datos recibidos
+        if (!checkDataIntegrity(data)) {
+          throw new Error('Los datos recibidos no son seguros');
+        }
+        
+        // Sanitizar datos antes de almacenar
+        const sanitizedData = data.map(cliente => ({
+          ...cliente,
+          nombre: escapeHtml(cliente.nombre),
+          apellido: escapeHtml(cliente.apellido),
+          correo: cliente.correo ? escapeHtml(cliente.correo) : '',
+        }));
+        
+        setClientes(sanitizedData);
       } catch (err) {
-        console.error('Error al obtener clientes:', err);
         setError('Error al cargar los pacientes');
       } finally {
         setLoading(false);
@@ -27,20 +91,32 @@ const Pacientes: React.FC = () => {
     };
 
     fetchClientes();
-  }, []);
+  }, []); // Removemos checkDataIntegrity de las dependencias
 
-  // Filtrar clientes
+  // Filtrar clientes con validaciones de seguridad
   const clientesFiltrados = clientes.filter(cliente => {
+    // Sanitizar término de búsqueda para prevenir XSS
+    const sanitizedSearchTerm = sanitizeInput(searchTerm);
+    
+    // Validar que el término de búsqueda no contenga patrones maliciosos
+    const suspiciousPatterns = [/<script/i, /javascript:/i, /on\w+=/i];
+    const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(sanitizedSearchTerm));
+    
+    if (isSuspicious) {
+      console.warn('Término de búsqueda sospechoso detectado:', searchTerm);
+      return false;
+    }
+    
     const matchesSearch = 
-      cliente.Nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cliente.Apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cliente.Rut.includes(searchTerm) ||
-      cliente.Correo?.toLowerCase().includes(searchTerm.toLowerCase());
+      cliente.nombre.toLowerCase().includes(sanitizedSearchTerm.toLowerCase()) ||
+      cliente.apellido.toLowerCase().includes(sanitizedSearchTerm.toLowerCase()) ||
+      cliente.rut.includes(sanitizedSearchTerm) ||
+      cliente.correo?.toLowerCase().includes(sanitizedSearchTerm.toLowerCase());
     
     const matchesProgreso = 
-      filtroProgreso === '' || cliente.Progreso === filtroProgreso;
+      filtroProgreso === '' || cliente.progreso === filtroProgreso;
     
-    return matchesSearch && matchesProgreso && !cliente.Inactividad;
+    return matchesSearch && matchesProgreso && !cliente.inactividad;
   });
 
   
@@ -84,22 +160,19 @@ const Pacientes: React.FC = () => {
     return new Date(date).toLocaleDateString('es-CL');
   };
 
-  // Funciones para las acciones
+  // Funciones para las acciones de cada paciente
   const handleVer = (cliente: Cliente) => {
-    console.log('Ver cliente:', cliente);
-    
+    // Aquí iría la lógica para ver los detalles del paciente
   };
 
   const handleEditar = (cliente: Cliente) => {
-    console.log('Editar cliente:', cliente);
-    
+    // Aquí iría la lógica para editar el paciente
   };
 
   const handleEliminar = (cliente: Cliente) => {
-    console.log('Eliminar cliente:', cliente);
-   
-    if (window.confirm(`¿Estás seguro de que deseas eliminar a ${cliente.Nombre} ${cliente.Apellido}?`)) {
-      
+    // Confirmar antes de eliminar un paciente
+    if (window.confirm(`¿Estás seguro de que deseas eliminar a ${cliente.nombre} ${cliente.apellido}?`)) {
+      // Aquí iría la lógica para eliminar el paciente
     }
   };
 
@@ -149,7 +222,7 @@ const Pacientes: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Pacientes</p>
-                <p className="text-2xl font-bold text-gray-900">{clientes.filter(c => !c.Inactividad).length}</p>
+                <p className="text-2xl font-bold text-gray-900">{clientes.filter(c => !c.inactividad).length}</p>
               </div>
             </div>
           </div>
@@ -164,7 +237,7 @@ const Pacientes: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Progreso Excelente</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {clientes.filter(c => c.Progreso === 'Excelente' && !c.Inactividad).length}
+                  {clientes.filter(c => c.progreso === 'Excelente' && !c.inactividad).length}
                 </p>
               </div>
             </div>
@@ -180,7 +253,7 @@ const Pacientes: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Necesitan Atención</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {clientes.filter(c => c.Progreso === 'Pendiente' && !c.Inactividad).length}
+                  {clientes.filter(c => c.progreso === 'Pendiente' && !c.inactividad).length}
                 </p>
               </div>
             </div>
@@ -213,9 +286,14 @@ const Pacientes: React.FC = () => {
                   type="text"
                   id="search"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    const sanitized = sanitizeInput(e.target.value);
+                    setSearchTerm(sanitized);
+                  }}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="Nombre, RUT o correo..."
+                  maxLength={100}
+                  autoComplete="off"
                 />
                 <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -296,34 +374,34 @@ const Pacientes: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {clientesPaginados.map((cliente) => (
-                      <tr key={cliente.ID_Cliente} className="hover:bg-gray-50 transition-colors duration-150">
+                      <tr key={cliente.id_cliente} className="hover:bg-gray-50 transition-colors duration-150">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
                               <span className="text-sm font-medium text-green-600">
-                                {getInitials(cliente.Nombre, cliente.Apellido)}
+                                {getInitials(cliente.nombre, cliente.apellido)}
                               </span>
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {cliente.Nombre} {cliente.Apellido}
+                                {cliente.nombre} {cliente.apellido}
                               </div>
                               <div className="text-sm text-gray-500">
-                                RUT: {cliente.Rut}
+                                RUT: {cliente.rut}
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{cliente.Correo || 'Sin correo'}</div>
+                          <div className="text-sm text-gray-900">{cliente.correo || 'Sin correo'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getProgresoColor(cliente.Progreso)}`}>
-                            {cliente.Progreso}
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getProgresoColor(cliente.progreso)}`}>
+                            {cliente.progreso}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(cliente.UltimaVisita)}
+                          {formatDate(cliente.ultimavisita)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">

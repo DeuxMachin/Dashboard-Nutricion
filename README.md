@@ -205,6 +205,29 @@ npm run preview
 - **Dashboard interactivo:** Vista general con estadísticas
 - **Responsive:** Adaptado para desktop y mobile
 - **Real-time:** Actualizaciones en tiempo real con Supabase
+- **🔒 Seguridad robusta:** Implementación completa de medidas de seguridad
+
+## 🔒 Medidas de Seguridad Implementadas
+
+Este dashboard implementa múltiples capas de seguridad para proteger los datos de pacientes y garantizar la confidencialidad médica:
+
+### Protecciones Activas
+- ✅ **Prevención SQL Injection:** Uso de Supabase con RLS y validación de datos
+- ✅ **Protección XSS:** Sanitización automática y escape HTML
+- ✅ **Tokens CSRF:** Generación y validación de tokens únicos
+- ✅ **Autenticación robusta:** Sistema dual con timeout de sesión
+- ✅ **Rate Limiting:** Protección contra ataques de fuerza bruta
+- ✅ **Validación de datos:** Verificación completa de entradas
+- ✅ **Monitoreo de seguridad:** Detección de actividad sospechosa
+
+### Panel de Administración de Seguridad
+Los usuarios administradores tienen acceso a:
+- Estado actual de protecciones
+- Configuración de tokens CSRF
+- Control de rate limiting
+- Recomendaciones de seguridad
+
+📋 **Ver documentación completa:** [SECURITY.md](./SECURITY.md)
 
 ## Credenciales de prueba
 

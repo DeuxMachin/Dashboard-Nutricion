@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { SecuritySettings } from './ui/SecuritySettings';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -200,6 +201,9 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Panel de Seguridad para Administradores */}
+        <SecuritySettings />
       </div>
     </div>
   );
