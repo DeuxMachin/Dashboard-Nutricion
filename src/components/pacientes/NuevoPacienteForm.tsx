@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { validateClienteData, sanitizeInput, generateCSRFToken } from '../../utils/security';
+import { validateClienteData, sanitizeInput } from '../../utils/security';
 import type { Cliente } from '../../types/index';
 
 interface NuevoPacienteFormProps {
@@ -38,7 +38,6 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [generalError, setGeneralError] = useState<string>('');
-  const [csrfToken] = useState(generateCSRFToken());
   const [tempValues, setTempValues] = useState({
     alergia: '',
     condicion: '',
@@ -50,10 +49,14 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
     'Soja', 'Pescado', 'Apio', 'Mostaza', 'Sésamo'
   ];
 
-  const condicionesComunes = [
-    'Diabetes tipo 1', 'Diabetes tipo 2', 'Hipertensión', 'Hipotiroidismo', 
-    'Hipertiroidismo', 'Colesterol alto', 'Enfermedad celíaca', 'Gastritis',
-    'Síndrome de intestino irritable', 'Osteoporosis'
+  const condicionesMedicasComunes = [
+    'Diabetes', 'Hipertensión', 'Colesterol alto', 'Obesidad', 
+    'Hipotiroidismo', 'Síndrome metabólico', 'Gastritis', 'Colon irritable'
+  ];
+
+  const tratamientosComunes = [
+    'Pérdida de peso', 'Control glucémico', 'Reducción colesterol',
+    'Control presión arterial', 'Ganancia masa muscular', 'Nutrición deportiva'
   ];
 
   const steps = [
@@ -87,7 +90,16 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
       case 1:
         if (!formData.nombre?.trim()) newErrors.nombre = 'El nombre es obligatorio';
         if (!formData.apellido?.trim()) newErrors.apellido = 'El apellido es obligatorio';
-        if (!formData.rut?.trim()) newErrors.rut = 'El RUT es obligatorio';
+        if (!formData.rut?.trim()) {
+          newErrors.rut = 'El RUT es obligatorio';
+        } else {
+          const rutLimpio = formData.rut.replace(/[\s.-]/g, '');
+          if (rutLimpio.length < 7) {
+            newErrors.rut = 'El RUT debe tener al menos 7 caracteres';
+          } else if (!/^[0-9]+[0-9kK]$/.test(rutLimpio)) {
+            newErrors.rut = 'El RUT tiene un formato inválido';
+          }
+        }
         if (formData.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.correo)) {
           newErrors.correo = 'El correo debe tener un formato válido';
         }
@@ -111,7 +123,32 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    const sanitizedValue = sanitizeInput(value);
+    let sanitizedValue = sanitizeInput(value);
+    
+    // Formateo especial para RUT
+    if (name === 'rut') {
+      // Solo permitir números, puntos, guiones y letra K/k
+      let cleanValue = value.replace(/[^0-9kK.-]/g, '');
+      
+      // Formatear automáticamente solo si es un RUT válido
+      if (cleanValue.length >= 7) {
+        // Remover puntos y guiones existentes para reformatear
+        const digitsOnly = cleanValue.replace(/[\.-]/g, '');
+        
+        if (digitsOnly.length >= 7 && digitsOnly.length <= 9) {
+          // Formatear como XXXXXXXX-X
+          const numbers = digitsOnly.slice(0, -1); 
+          const dv = digitsOnly.slice(-1); 
+          
+          // Por ahora, formato simple sin puntos
+          sanitizedValue = numbers + '-' + dv;
+        } else {
+          sanitizedValue = cleanValue;
+        }
+      } else {
+        sanitizedValue = cleanValue;
+      }
+    }
     
     setFormData(prev => ({
       ...prev,
@@ -164,10 +201,23 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
         }
       }
 
+      // Solo enviar los campos que existen en la tabla cliente
       const dataToSubmit = {
-        ...formData,
-        csrf_token: csrfToken,
-        timestamp: new Date().toISOString()
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        rut: formData.rut,
+        correo: formData.correo || undefined,
+        telefono: formData.telefono || undefined,
+        fecha_nacimiento: formData.fecha_nacimiento || undefined,
+        genero: formData.genero || undefined,
+        altura: formData.altura || undefined,
+        peso: formData.peso || undefined,
+        peso_objetivo: formData.peso_objetivo || undefined,
+        alergias: formData.alergias || [],
+        condiciones_medicas: formData.condiciones_medicas || [],
+        tratamientos: formData.tratamientos || [],
+        objetivos: formData.objetivos || undefined,
+        progreso: formData.progreso || 'Pendiente'
       };
 
       await onSubmit(dataToSubmit);
@@ -442,10 +492,11 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
     <div className="space-y-6">
       <div className="text-center mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Historial Médico</h3>
-        <p className="text-sm text-gray-600">Alergias, condiciones y tratamientos</p>
+        <p className="text-sm text-gray-600">Alergias, condiciones médicas y tratamientos</p>
       </div>
 
       <div className="space-y-6">
+        {/* Alergias Alimentarias */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
             Alergias Alimentarias
@@ -456,7 +507,7 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
                 key={alergia}
                 type="button"
                 onClick={() => handleArrayField('alergias', alergia)}
-                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={formData.alergias?.includes(alergia) || isLoading}
               >
                 + {alergia}
@@ -471,6 +522,7 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="Agregar otra alergia..."
               disabled={isLoading}
+              maxLength={50}
             />
             <button
               type="button"
@@ -478,7 +530,7 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
                 handleArrayField('alergias', tempValues.alergia);
                 setTempValues(prev => ({ ...prev, alergia: '' }));
               }}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!tempValues.alergia.trim() || isLoading}
             >
               Agregar
@@ -494,7 +546,127 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
                 <button
                   type="button"
                   onClick={() => removeArrayItem('alergias', index)}
-                  className="ml-2 text-red-600 hover:text-red-800"
+                  className="ml-2 text-red-600 hover:text-red-800 focus:outline-none"
+                  disabled={isLoading}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Condiciones Médicas */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Condiciones Médicas
+          </label>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {condicionesMedicasComunes.map((condicion) => (
+              <button
+                key={condicion}
+                type="button"
+                onClick={() => handleArrayField('condiciones_medicas', condicion)}
+                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={formData.condiciones_medicas?.includes(condicion) || isLoading}
+              >
+                + {condicion}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={tempValues.condicion}
+              onChange={(e) => setTempValues(prev => ({ ...prev, condicion: e.target.value }))}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Agregar otra condición médica..."
+              disabled={isLoading}
+              maxLength={50}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                handleArrayField('condiciones_medicas', tempValues.condicion);
+                setTempValues(prev => ({ ...prev, condicion: '' }));
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!tempValues.condicion.trim() || isLoading}
+            >
+              Agregar
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {formData.condiciones_medicas?.map((condicion, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-full"
+              >
+                {condicion}
+                <button
+                  type="button"
+                  onClick={() => removeArrayItem('condiciones_medicas', index)}
+                  className="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none"
+                  disabled={isLoading}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Tratamientos */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Tratamientos Objetivo
+          </label>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {tratamientosComunes.map((tratamiento) => (
+              <button
+                key={tratamiento}
+                type="button"
+                onClick={() => handleArrayField('tratamientos', tratamiento)}
+                className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={formData.tratamientos?.includes(tratamiento) || isLoading}
+              >
+                + {tratamiento}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={tempValues.tratamiento}
+              onChange={(e) => setTempValues(prev => ({ ...prev, tratamiento: e.target.value }))}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Agregar otro tratamiento..."
+              disabled={isLoading}
+              maxLength={50}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                handleArrayField('tratamientos', tempValues.tratamiento);
+                setTempValues(prev => ({ ...prev, tratamiento: '' }));
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!tempValues.tratamiento.trim() || isLoading}
+            >
+              Agregar
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {formData.tratamientos?.map((tratamiento, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center px-3 py-1 text-sm bg-green-100 text-green-800 rounded-full"
+              >
+                {tratamiento}
+                <button
+                  type="button"
+                  onClick={() => removeArrayItem('tratamientos', index)}
+                  className="ml-2 text-green-600 hover:text-green-800 focus:outline-none"
                   disabled={isLoading}
                 >
                   ×
@@ -523,11 +695,15 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
           name="objetivos"
           value={formData.objetivos || ''}
           onChange={handleChange}
-          rows={4}
+          rows={6}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-          placeholder="Describe los objetivos nutricionales del paciente..."
+          placeholder="Describe los objetivos nutricionales del paciente...&#10;&#10;Ejemplo:&#10;- Reducir peso de forma gradual&#10;- Mejorar hábitos alimentarios&#10;- Controlar niveles de glucosa"
           disabled={isLoading}
+          maxLength={500}
         />
+        <div className="mt-1 text-xs text-gray-500 text-right">
+          {(formData.objetivos || '').length}/500 caracteres
+        </div>
       </div>
 
       <div className="bg-gray-50 p-6 rounded-lg">
@@ -538,12 +714,14 @@ export const NuevoPacienteForm: React.FC<NuevoPacienteFormProps> = ({
             <p><span className="font-medium">RUT:</span> {formData.rut}</p>
             <p><span className="font-medium">Correo:</span> {formData.correo || 'No especificado'}</p>
             <p><span className="font-medium">Género:</span> {formData.genero || 'No especificado'}</p>
+            <p><span className="font-medium">Alergias:</span> {formData.alergias?.length ? formData.alergias.length : 'Ninguna'}</p>
           </div>
           <div>
             <p><span className="font-medium">Altura:</span> {formData.altura ? `${formData.altura} cm` : 'No especificada'}</p>
             <p><span className="font-medium">Peso actual:</span> {formData.peso ? `${formData.peso} kg` : 'No especificado'}</p>
             <p><span className="font-medium">Peso objetivo:</span> {formData.peso_objetivo ? `${formData.peso_objetivo} kg` : 'No especificado'}</p>
-            <p><span className="font-medium">Alergias:</span> {formData.alergias?.length ? formData.alergias.length : 'Ninguna'}</p>
+            <p><span className="font-medium">Condiciones médicas:</span> {formData.condiciones_medicas?.length ? formData.condiciones_medicas.length : 'Ninguna'}</p>
+            <p><span className="font-medium">Tratamientos:</span> {formData.tratamientos?.length ? formData.tratamientos.length : 'Ninguno'}</p>
           </div>
         </div>
       </div>

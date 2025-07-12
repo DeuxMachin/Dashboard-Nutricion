@@ -25,12 +25,11 @@ export interface Cliente {
   genero?: 'Masculino' | 'Femenino' | 'Otro';
   altura?: number;
   peso?: number;
-  alergias?: string[]; 
-  condiciones_medicas?: string[]; 
-  tratamientos?: string[];
   peso_objetivo?: number;
   objetivos?: string;
-
+  alergias?: string[];
+  condiciones_medicas?: string[];
+  tratamientos?: string[];
 }
 
 export interface Login {

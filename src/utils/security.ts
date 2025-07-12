@@ -22,32 +22,42 @@ export const validateEmail = (email: string): boolean => {
 };
 
 /**
- * Valida formato de RUT chileno
+ * Valida formato de RUT chileno (versión simplificada)
  */
 export const validateRUT = (rut: string): boolean => {
-  // Formato: 12345678-9 o 12.345.678-9
-  const rutRegex = /^(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK])$/;
+  if (!rut || typeof rut !== 'string') return false;
   
-  if (!rutRegex.test(rut)) return false;
+  // Solo verificar que no esté vacío y tenga al menos 7 caracteres
+  const cleanRut = rut.replace(/[\s.-]/g, '');
   
-  // Limpiar RUT para validación de dígito verificador
-  const cleanRut = rut.replace(/[.-]/g, '');
+  return cleanRut.length >= 7;
+};
+
+/**
+ * Formatea un RUT al formato estándar (ej: 12345678-9)
+ */
+export const formatRUT = (rut: string): string => {
+  if (!rut) return '';
+  
+  // Limpiar RUT
+  const cleanRut = rut.replace(/[\s.-]/g, '');
+  
+  if (cleanRut.length < 8) return cleanRut;
+  
+  // Extraer número y dígito verificador
   const body = cleanRut.slice(0, -1);
-  const dv = cleanRut.slice(-1).toLowerCase();
+  const dv = cleanRut.slice(-1);
   
-  // Calcular dígito verificador
-  let sum = 0;
-  let multiplier = 2;
-  
-  for (let i = body.length - 1; i >= 0; i--) {
-    sum += parseInt(body[i]) * multiplier;
-    multiplier = multiplier === 7 ? 2 : multiplier + 1;
+  // Formatear con puntos y guión
+  let formattedBody = '';
+  for (let i = 0; i < body.length; i++) {
+    if (i > 0 && (body.length - i) % 3 === 0) {
+      formattedBody += '.';
+    }
+    formattedBody += body[i];
   }
   
-  const remainder = sum % 11;
-  const calculatedDV = remainder === 0 ? '0' : remainder === 1 ? 'k' : (11 - remainder).toString();
-  
-  return dv === calculatedDV;
+  return `${formattedBody}-${dv}`;
 };
 
 /**
@@ -88,6 +98,7 @@ export const validateClienteData = (data: any): { isValid: boolean; errors: stri
   }
   
   if (!data.rut || !validateRUT(data.rut)) {
+    console.log('Error en RUT:', data.rut, 'validateRUT result:', validateRUT(data.rut));
     errors.push('El RUT no es válido');
   }
   

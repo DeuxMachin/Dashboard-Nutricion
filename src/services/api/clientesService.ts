@@ -54,6 +54,7 @@ export const clientesService = {
     try {
       // Validar datos de entrada
       const validation = validateClienteData(clienteData);
+      
       if (!validation.isValid) {
         throw new Error(`Datos inválidos: ${validation.errors.join(', ')}`);
       }
@@ -92,9 +93,22 @@ export const clientesService = {
         throw new Error('No se pudo identificar al nutricionista');
       }
 
-      // Preparar datos del cliente
+      // Preparar datos del cliente (solo campos que existen en la tabla)
       const nuevoCliente = {
-        ...sanitizedData,
+        nombre: sanitizedData.nombre,
+        apellido: sanitizedData.apellido,
+        rut: sanitizedData.rut,
+        correo: sanitizedData.correo,
+        telefono: sanitizedData.telefono,
+        fecha_nacimiento: sanitizedData.fecha_nacimiento,
+        genero: sanitizedData.genero,
+        altura: sanitizedData.altura,
+        peso: sanitizedData.peso,
+        peso_objetivo: sanitizedData.peso_objetivo,
+        alergias: sanitizedData.alergias || [],
+        condiciones_medicas: sanitizedData.condiciones_medicas || [],
+        tratamientos: sanitizedData.tratamientos || [],
+        objetivos: sanitizedData.objetivos,
         id_nutri: nutricionistaId,
         inactividad: false,
         progreso: sanitizedData.progreso || 'Pendiente'
