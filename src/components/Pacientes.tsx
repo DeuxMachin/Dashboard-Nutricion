@@ -4,6 +4,7 @@ import type { Cliente } from '../types/index';
 import { sanitizeInput, escapeHtml } from '../utils/security';
 import DropdownMenu from './ui/DropdownMenu';
 import { NuevoPacienteForm } from './pacientes/NuevoPacienteForm';
+import { DetallePaciente } from './pacientes/DetallePaciente';
 
 const Pacientes: React.FC = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -13,12 +14,12 @@ const Pacientes: React.FC = () => {
   const [filtroProgreso, setFiltroProgreso] = useState<string>('');
   const [showNewPatientForm, setShowNewPatientForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  
+  const [vistaActual, setVistaActual] = useState<'lista' | 'detalle'>('lista');
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<number | null>(null);
   const [paginaActual, setPaginaActual] = useState(1);
   const clientesPorPagina = 7;
 
-  // Función para verificar integridad de datos - memoizada para evitar re-renders
+  // Función para verificar integridad de datos
   const checkDataIntegrity = useCallback((data: any): boolean => {
     try {
       const jsonString = JSON.stringify(data);
@@ -35,111 +36,49 @@ const Pacientes: React.FC = () => {
     }
   }, []);
 
-  // Monitoreo de seguridad implementado directamente
-  useEffect(() => {
-    const detectSuspiciousActivity = (event: Event) => {
-      const target = event.target as HTMLElement;
+  // Cargar clientes
+  const loadClientes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await clientesService.getClientes();
       
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        const value = (target as HTMLInputElement).value;
-        
-        const suspiciousPatterns = [
-          /<script/i,
-          /javascript:/i,
-          /on\w+=/i,
-          /eval\(/i,
-          /document\./i,
-          /window\./i,
-        ];
-
-        const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(value));
-        
-        if (isSuspicious) {
-          console.warn('Actividad sospechosa detectada en Pacientes:', value);
-        }
+      if (!checkDataIntegrity(data)) {
+        throw new Error('Los datos recibidos no son seguros');
       }
-    };
-
-    document.addEventListener('input', detectSuspiciousActivity);
-    
-    return () => {
-      document.removeEventListener('input', detectSuspiciousActivity);
-    };
-  }, []);
+      
+      setClientes(data);
+    } catch (err: any) {
+      setError(err.error || 'Error al cargar pacientes');
+    } finally {
+      setLoading(false);
+    }
+  }, [checkDataIntegrity]);
 
   useEffect(() => {
-    const fetchClientes = async () => {
-      try {
-        setLoading(true);
-        const data = await clientesService.getClientes();
-        
-        // Validar integridad de los datos recibidos
-        if (!checkDataIntegrity(data)) {
-          throw new Error('Los datos recibidos no son seguros');
-        }
-        
-        // Sanitizar datos antes de almacenar
-        const sanitizedData = data.map(cliente => ({
-          ...cliente,
-          nombre: escapeHtml(cliente.nombre),
-          apellido: escapeHtml(cliente.apellido),
-          correo: cliente.correo ? escapeHtml(cliente.correo) : '',
-        }));
-        
-        setClientes(sanitizedData);
-      } catch (err) {
-        setError('Error al cargar los pacientes');
-      } finally {
-        setLoading(false);
-      }
-    };
+    loadClientes();
+  }, [loadClientes]);
 
-    fetchClientes();
-  }, []); // Removemos checkDataIntegrity de las dependencias
-
-  // Filtrar clientes con validaciones de seguridad
+  // Filtros y búsqueda
   const clientesFiltrados = clientes.filter(cliente => {
-    // Sanitizar término de búsqueda para prevenir XSS
-    const sanitizedSearchTerm = sanitizeInput(searchTerm);
+    const matchesSearch = !searchTerm || 
+      cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.rut.includes(searchTerm) ||
+      (cliente.correo && cliente.correo.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    // Validar que el término de búsqueda no contenga patrones maliciosos
-    const suspiciousPatterns = [/<script/i, /javascript:/i, /on\w+=/i];
-    const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(sanitizedSearchTerm));
+    const matchesProgreso = !filtroProgreso || cliente.progreso === filtroProgreso;
     
-    if (isSuspicious) {
-      console.warn('Término de búsqueda sospechoso detectado:', searchTerm);
-      return false;
-    }
-    
-    const matchesSearch = 
-      cliente.nombre.toLowerCase().includes(sanitizedSearchTerm.toLowerCase()) ||
-      cliente.apellido.toLowerCase().includes(sanitizedSearchTerm.toLowerCase()) ||
-      cliente.rut.includes(sanitizedSearchTerm) ||
-      cliente.correo?.toLowerCase().includes(sanitizedSearchTerm.toLowerCase());
-    
-    const matchesProgreso = 
-      filtroProgreso === '' || cliente.progreso === filtroProgreso;
-    
-    return matchesSearch && matchesProgreso && !cliente.inactividad;
+    return matchesSearch && matchesProgreso;
   });
 
-  
+  // Paginación
   const totalPaginas = Math.ceil(clientesFiltrados.length / clientesPorPagina);
   const indiceInicio = (paginaActual - 1) * clientesPorPagina;
   const indiceFin = indiceInicio + clientesPorPagina;
   const clientesPaginados = clientesFiltrados.slice(indiceInicio, indiceFin);
 
- 
-  useEffect(() => {
-    setPaginaActual(1);
-  }, [searchTerm, filtroProgreso]);
-
-  const cambiarPagina = (nuevaPagina: number) => {
-    if (nuevaPagina >= 1 && nuevaPagina <= totalPaginas) {
-      setPaginaActual(nuevaPagina);
-    }
-  };
-
+  // Funciones de utilidad
   const getProgresoColor = (progreso: string) => {
     switch (progreso) {
       case 'Excelente':
@@ -164,64 +103,55 @@ const Pacientes: React.FC = () => {
     return new Date(date).toLocaleDateString('es-CL');
   };
 
-  // Funciones para las acciones de cada paciente
+  // Funciones de navegación
   const handleVer = (cliente: Cliente) => {
-    // Aquí iría la lógica para ver los detalles del paciente
-    console.log('Ver detalles de:', cliente.nombre);
+    setClienteSeleccionado(cliente.id_cliente);
+    setVistaActual('detalle');
   };
 
+  const handleVolverALista = () => {
+    setVistaActual('lista');
+    setClienteSeleccionado(null);
+  };
+
+  // Otras funciones de acción
   const handleEditar = (cliente: Cliente) => {
-    // Aquí iría la lógica para editar el paciente
     console.log('Editar paciente:', cliente.nombre);
   };
 
   const handleEliminar = (cliente: Cliente) => {
-    // Confirmar antes de eliminar un paciente
     if (window.confirm(`¿Estás seguro de que deseas eliminar a ${cliente.nombre} ${cliente.apellido}?`)) {
-      // Aquí iría la lógica para eliminar el paciente
       console.log('Eliminar paciente:', cliente.nombre);
     }
   };
 
-  // Nuevas funciones para las acciones adicionales
   const handleRegistrarVisita = (cliente: Cliente) => {
-    // Aquí iría la lógica para registrar una nueva visita
     console.log('Registrar visita para:', cliente.nombre);
   };
 
   const handleEditarPlan = (cliente: Cliente) => {
-    // Aquí iría la lógica para editar el plan nutricional
     console.log('Editar plan de:', cliente.nombre);
   };
 
   const handleVerHistorial = (cliente: Cliente) => {
-    // Aquí iría la lógica para ver el historial médico
     console.log('Ver historial de:', cliente.nombre);
   };
 
-  const handleEnviarMensaje = (cliente: Cliente) => {
-    // Aquí iría la lógica para enviar un mensaje al paciente
-    console.log('Enviar mensaje a:', cliente.nombre);
-  };
-
-  // Función para manejar el nuevo paciente
-  const handleNuevoPaciente = async (data: Partial<Cliente>) => {
+  // Manejo del formulario de nuevo paciente
+  const handleCreatePatient = async (clienteData: Partial<Cliente>) => {
     try {
       setIsSubmitting(true);
       setError('');
       
-      const nuevoCliente = await clientesService.createCliente(data);
+      if (!checkDataIntegrity(clienteData)) {
+        throw new Error('Los datos del paciente no son seguros');
+      }
       
-      // Actualizar la lista de clientes
-      setClientes(prev => [nuevoCliente, ...prev]);
+      await clientesService.createCliente(clienteData);
       setShowNewPatientForm(false);
-      
-      // Mensaje de éxito (podrías agregar un toast aquí)
-      console.log('Paciente creado exitosamente:', nuevoCliente.nombre);
-      
-    } catch (err) {
-      console.error('Error al crear paciente:', err);
-      setError('Error al crear el paciente. Por favor, intenta nuevamente.');
+      await loadClientes(); // Recargar la lista
+    } catch (err: any) {
+      setError(err.error || 'Error al crear el paciente');
     } finally {
       setIsSubmitting(false);
     }
@@ -232,7 +162,7 @@ const Pacientes: React.FC = () => {
     setError('');
   };
 
-  // Función para generar las opciones del dropdown menu
+  // Opciones del dropdown
   const getDropdownOptions = (cliente: Cliente) => [
     {
       label: 'Ver detalles',
@@ -259,41 +189,31 @@ const Pacientes: React.FC = () => {
       label: 'Editar plan',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
       ),
       onClick: () => handleEditarPlan(cliente),
-      color: 'warning' as const
+      color: 'default' as const
     },
     {
       label: 'Ver historial',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
       onClick: () => handleVerHistorial(cliente),
       color: 'default' as const
     },
     {
-      label: 'Enviar mensaje',
-      icon: (
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      ),
-      onClick: () => handleEnviarMensaje(cliente),
-      color: 'default' as const
-    },
-    {
       label: 'Editar paciente',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
         </svg>
       ),
       onClick: () => handleEditar(cliente),
-      color: 'warning' as const
+      color: 'default' as const
     },
     {
       label: 'Eliminar paciente',
@@ -307,45 +227,44 @@ const Pacientes: React.FC = () => {
     }
   ];
 
-  if (loading) {
+  // Renderizado condicional para mostrar detalle del paciente
+  if (vistaActual === 'detalle' && clienteSeleccionado) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando pacientes...</p>
-        </div>
-      </div>
+      <DetallePaciente 
+        clienteId={clienteSeleccionado} 
+        onBack={handleVolverALista}
+      />
     );
   }
 
-  // Si mostrar formulario de nuevo paciente
+  // Mostrar formulario de nuevo paciente
   if (showNewPatientForm) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-6">
             <div className="flex items-center">
               <button
                 onClick={handleCancelNewPatient}
-                className="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mr-4"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                 </svg>
+                Volver
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Nuevo Paciente</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  Completa la información para registrar un nuevo paciente
-                </p>
-              </div>
+              <h1 className="text-2xl font-bold text-gray-900">Nuevo Paciente</h1>
             </div>
           </div>
-        </div>
-        
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
+
           <NuevoPacienteForm
-            onSubmit={handleNuevoPaciente}
+            onSubmit={handleCreatePatient}
             onCancel={handleCancelNewPatient}
             isLoading={isSubmitting}
           />
@@ -354,6 +273,7 @@ const Pacientes: React.FC = () => {
     );
   }
 
+  // Renderizado principal - lista de pacientes
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -392,7 +312,7 @@ const Pacientes: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Pacientes</p>
-                <p className="text-2xl font-bold text-gray-900">{clientes.filter(c => !c.inactividad).length}</p>
+                <p className="text-2xl font-semibold text-gray-900">{clientes.length}</p>
               </div>
             </div>
           </div>
@@ -405,9 +325,9 @@ const Pacientes: React.FC = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Progreso Excelente</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {clientes.filter(c => c.progreso === 'Excelente' && !c.inactividad).length}
+                <p className="text-sm font-medium text-gray-600">En Progreso Excelente</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {clientes.filter(c => c.progreso === 'Excelente').length}
                 </p>
               </div>
             </div>
@@ -417,13 +337,13 @@ const Pacientes: React.FC = () => {
             <div className="flex items-center">
               <div className="p-2 bg-yellow-100 rounded-lg">
                 <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Necesitan Atención</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {clientes.filter(c => c.progreso === 'Pendiente' && !c.inactividad).length}
+                <p className="text-sm font-medium text-gray-600">Pendientes</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {clientes.filter(c => c.progreso === 'Pendiente').length}
                 </p>
               </div>
             </div>
@@ -437,8 +357,8 @@ const Pacientes: React.FC = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Visitas Este Mes</p>
-                <p className="text-2xl font-bold text-gray-900">23</p>
+                <p className="text-sm font-medium text-gray-600">Visitas Esta Semana</p>
+                <p className="text-2xl font-semibold text-gray-900">0</p>
               </div>
             </div>
           </div>
@@ -446,37 +366,34 @@ const Pacientes: React.FC = () => {
 
         {/* Filtros y búsqueda */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2">
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
                 Buscar paciente
               </label>
               <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
                 <input
                   type="text"
                   id="search"
                   value={searchTerm}
-                  onChange={(e) => {
-                    const sanitized = sanitizeInput(e.target.value);
-                    setSearchTerm(sanitized);
-                  }}
+                  onChange={(e) => setSearchTerm(sanitizeInput(e.target.value))}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="Nombre, RUT o correo..."
-                  maxLength={100}
-                  autoComplete="off"
                 />
-                <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
               </div>
             </div>
 
             <div>
-              <label htmlFor="progreso" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filtroProgreso" className="block text-sm font-medium text-gray-700 mb-2">
                 Filtrar por progreso
               </label>
               <select
-                id="progreso"
+                id="filtroProgreso"
                 value={filtroProgreso}
                 onChange={(e) => setFiltroProgreso(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -508,8 +425,12 @@ const Pacientes: React.FC = () => {
         )}
 
         {/* Lista de pacientes */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
-          {clientesFiltrados.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8" style={{ overflow: 'visible' }}>
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+            </div>
+          ) : clientesFiltrados.length === 0 ? (
             <div className="text-center py-12">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -521,7 +442,7 @@ const Pacientes: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-visible">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -587,7 +508,7 @@ const Pacientes: React.FC = () => {
                 </table>
               </div>
 
-              
+              {/* Paginación */}
               {totalPaginas > 1 && (
                 <div className="bg-white px-6 py-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
@@ -598,74 +519,23 @@ const Pacientes: React.FC = () => {
                         <span className="font-medium">{clientesFiltrados.length}</span> pacientes
                       </span>
                     </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      {/*  página anterior */}
+                    <div className="flex space-x-2">
                       <button
-                        onClick={() => cambiarPagina(paginaActual - 1)}
+                        onClick={() => setPaginaActual(prev => Math.max(prev - 1, 1))}
                         disabled={paginaActual === 1}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors duration-200 ${
-                          paginaActual === 1
-                            ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        }`}
+                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                        
+                        Anterior
                       </button>
-
-                      {/* Números de página */}
-                      <div className="flex space-x-1">
-                        {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((numeroPagina) => {
-                          // Mostrar solo algunas páginas para evitar overflow
-                          if (
-                            numeroPagina === 1 ||
-                            numeroPagina === totalPaginas ||
-                            (numeroPagina >= paginaActual - 1 && numeroPagina <= paginaActual + 1)
-                          ) {
-                            return (
-                              <button
-                                key={numeroPagina}
-                                onClick={() => cambiarPagina(numeroPagina)}
-                                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors duration-200 ${
-                                  paginaActual === numeroPagina
-                                    ? 'bg-green-600 text-white border-green-600'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                                }`}
-                              >
-                                {numeroPagina}
-                              </button>
-                            );
-                          } else if (
-                            numeroPagina === paginaActual - 2 ||
-                            numeroPagina === paginaActual + 2
-                          ) {
-                            return (
-                              <span key={numeroPagina} className="px-2 py-2 text-sm text-gray-500">
-                                ...
-                              </span>
-                            );
-                          }
-                          return null;
-                        })}
-                      </div>
-
-                      {/*  página siguiente */}
+                      <span className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md">
+                        {paginaActual} de {totalPaginas}
+                      </span>
                       <button
-                        onClick={() => cambiarPagina(paginaActual + 1)}
+                        onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}
                         disabled={paginaActual === totalPaginas}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors duration-200 ${
-                          paginaActual === totalPaginas
-                            ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        }`}
+                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        
-                        <svg className="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
+                        Siguiente
                       </button>
                     </div>
                   </div>

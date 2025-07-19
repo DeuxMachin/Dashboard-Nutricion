@@ -36,9 +36,9 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ options, className = '' }) 
   useEffect(() => {
     if (isOpen && dropdownRef.current) {
       const rect = dropdownRef.current.getBoundingClientRect();
-      const menuHeight = 300; // Altura aproximada del menú
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
+      const menuHeight = 180; // Altura aproximada del menú basada en el número de opciones
+      const spaceBelow = window.innerHeight - rect.bottom - 20; // Margen de seguridad
+      const spaceAbove = rect.top - 20; // Margen de seguridad
 
       if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
         setPosition('top');
@@ -81,9 +81,12 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ options, className = '' }) 
       {isOpen && (
         <div 
           ref={menuRef}
-          className={`absolute right-0 z-50 w-56 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100 origin-top-right ${
+          className={`absolute right-0 z-[9999] w-56 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100 origin-top-right ${
             position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
           }`}
+          style={{
+            transform: position === 'top' ? 'translateY(-8px)' : 'translateY(8px)'
+          }}
         >
           <div className="py-1" role="menu" aria-orientation="vertical">
             {options.map((option, index) => (
